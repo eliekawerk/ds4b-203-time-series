@@ -222,7 +222,7 @@ log_standardized_transactions_product_page_tbl %>%
 - What about the relationship between Jumpstart, Learning Labs PRO page visits and Revenue?
 
 
-Revenue is positively correlated for roughly 2 days after sessions to 101 course page visits. Perhaps students take a day or two to think about the decision. There may be an opportunity to follow up with those that do not enroll. 
+Revenue is positively correlated for roughly 2 lags after sessions to 101 course page visits. Perhaps students take a week or two to think about the decision. There may be an opportunity to follow up with those that do not enroll. 
 
 Learning Labs have a longer period (up to 7 lags) of a relationship with revenue. Jumpstart dips right away (as students take the free class), but then rises through lag 7 to 10. Perhaps this is when students finish the course and then make a purchase. 
 
