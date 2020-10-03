@@ -117,7 +117,12 @@ forecast_tbl <- data_prepared_full_tbl %>%
 
 # 3.0 TRAIN/TEST (MODEL DATASET) ----
 
+splits <- data_prepared_tbl %>%
+    time_series_split(date_var = optin_time, assess = horizon, cumulative = T)
 
+splits %>%
+    tk_time_series_cv_plan() %>%
+    plot_time_series_cv_plan(optin_time, optins_trans)
 
 # 4.0 RECIPES ----
 # - Time Series Signature - Adds bulk time-based features
@@ -125,20 +130,71 @@ forecast_tbl <- data_prepared_full_tbl %>%
 # - Interaction: wday.lbl:week2
 # - Fourier Features
 
+model_fit_best_lm <- read_rds("00_models/model_fit_best_lm.rds")
 
+model_fit_best_lm %>% summary()
+
+model_fit_best_lm$terms %>% formula()
+
+recipe_spec_base <- recipe(optins_trans ~ ., data = training(splits)) %>%
+    
+    # time series signature
+    step_timeseries_signature(optin_time) %>%
+    step_rm(matches("(iso)|(.xts)|(hour)|(minute)|(second)|(am.pm)")) %>%
+    
+    # standardization
+    step_normalize(matches("(index.num)|(year)|(yday)")) %>%
+    
+    # one-hot encoding
+    step_dummy(all_nominal(), one_hot = T) %>%
+    
+    # interaction
+    step_interact(~ matches("(week2)") * matches("(wday.lbl)")) %>%
+    
+    # fourier series
+    step_fourier(optin_time, period = c(7, 14, 30, 90, 365), K = 2)
+
+recipe_spec_base %>% prep() %>% juice() %>% glimpse()
 
 # 5.0 SPLINE MODEL ----
 
 # * LM Model Spec ----
-
+model_spec_lm <- linear_reg() %>%
+    set_engine("lm")
 
 # * Spline Recipe Spec ----
+recipe_spec_1 <- recipe_spec_base %>%
+    step_rm(optin_time) %>%
+    step_ns(ends_with("index.num"), deg_free = 2) %>%
+    step_rm(starts_with("lag_"))
 
+recipe_spec_1 %>% prep() %>% juice() %>% glimpse()
 
 # * Spline Workflow  ----
 
+workflow_fit_lm_1_spline <- workflow() %>%
+    add_model(model_spec_lm) %>%
+    add_recipe(recipe_spec_1) %>%
+    fit(training(splits))
+
+workflow_fit_lm_1_spline %>%
+    pull_workflow_fit() %>%
+    pluck("fit") %>%
+    summary()
 
 # 6.0 MODELTIME  ----
+
+calibration_tbl <- modeltime_table(workflow_fit_lm_1_spline) %>%
+    modeltime_calibrate(new_data = testing(splits))
+
+calibration_tbl %>%
+    modeltime_forecast(
+        new_data = testing(splits),
+        actual_data = data_prepared_tbl
+    ) %>%
+    plot_modeltime_forecast()
+
+calibration_tbl %>% modeltime_accuracy()
 
 
 
